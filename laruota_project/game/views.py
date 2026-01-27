@@ -47,32 +47,32 @@ def setup_partita(request):
 def gioco(request):
     partita_id = request.session.get('partita_id')
     if not partita_id: return redirect('setup_partita')
-    partita = get_object_or_404(Partita, id=partita_id)
     
+    partita = get_object_or_404(Partita, id=partita_id)
     giocatori = partita.giocatori.all()
-    if partita.turno_corrente >= len(giocatori):
+    
+    # --- FIX CRITICO: SICUREZZA INDICI ---
+    # Se per qualche motivo (es. cambio round) l'indice è fuori scala, lo resettiamo a 0
+    if not giocatori or partita.turno_corrente >= len(giocatori):
         partita.turno_corrente = 0
         partita.save()
-        
+    
     giocatore_corrente = giocatori[partita.turno_corrente]
-
     valore_ruota = request.session.get('valore_ruota', 0)
     messaggio = request.session.pop('messaggio', '')
     
+    # Costruzione Tabellone
     if request.session.get('round_vinto'):
-        # Se vinto, mostriamo tutto. Creiamo la struttura a parole manualmente.
         tabellone = []
         for parola_raw in partita.frase_corrente.testo.upper().split(' '):
             parola_obj = [{'char': c, 'visibile': True} for c in parola_raw]
             tabellone.append(parola_obj)
     else:
-        # Usa il nuovo metodo che raggruppa per parole
         tabellone = partita.get_tabellone_a_parole()
 
-
     context = {
-        'tabellone': tabellone,
         'partita': partita,
+        'tabellone': tabellone,
         'giocatori': giocatori,
         'giocatore_corrente': giocatore_corrente,
         'valore_ruota': valore_ruota,
@@ -81,113 +81,102 @@ def gioco(request):
     return render(request, 'game/gioco.html', context)
 
 def azione_gioco(request):
-    if request.method != 'POST': return redirect('gioco')
-    
-    partita = get_object_or_404(Partita, id=request.session['partita_id'])
-    giocatori = list(partita.giocatori.all())
+    partita_id = request.session.get('partita_id')
+    partita = get_object_or_404(Partita, id=partita_id)
+    giocatori = partita.giocatori.all()
     giocatore_attivo = giocatori[partita.turno_corrente]
-    tipo = request.POST.get('tipo')
-
-    # Recuperiamo il valore (che potrebbe essere PASSA/BANCAROTTA ma è già stato gestito)
-    valore_ruota = request.session.get('valore_ruota', 0)
-
-    # Se l'utente sta cercando di fare un'azione ma il turno è passato (es. ricaricamento strano)
-    # blocchiamo tutto, ma nel flusso normale non dovrebbe succedere.
     
-    if tipo == 'lettera':
-        lettera = request.POST.get('lettera_input', '').upper().strip()
-        vocali = "AEIOU"
-        
-        if not lettera: return redirect('gioco')
+    if request.method == 'POST':
+        tipo = request.POST.get('tipo')
+        valore_ruota = request.session.get('valore_ruota', 0)
 
-        # --- CONTROLLO GLOBALE: LETTERA GIÀ CHIAMATA ---
-        if lettera in partita.lettere_chiamate:
-             request.session['messaggio'] = f"La lettera '{lettera}' è già stata detta! PERDI IL TURNO."
-             # PENALITÀ: CAMBIO TURNO
-             partita.turno_corrente = (partita.turno_corrente + 1) % len(giocatori)
-             partita.save()
-             request.session['valore_ruota'] = 0 
-             return redirect('gioco')
-
-        # Se per qualche motivo il valore è ancora Passa/Bancarotta (bug visivo), impediamo azioni
-        if valore_ruota in ['PASSA', 'BANCAROTTA']:
-             request.session['messaggio'] = "Il turno è passato!"
-             return redirect('gioco')
-
-        if tipo == 'tempo_scaduto':
-            request.session['messaggio'] = f"⏰ TEMPO SCADUTO! {giocatore_attivo.nome} è stato troppo lento."
-            partita.turno_corrente = (partita.turno_corrente + 1) % len(giocatori)
-            partita.save()
-            request.session['valore_ruota'] = 0 # Reset ruota
-            return redirect('gioco')
-    
-
-        if lettera in vocali:
-            # COMPRA VOCALE
-            if giocatore_attivo.punteggio < 500:
-                request.session['messaggio'] = "Non hai 500€ per la vocale!"
-                return redirect('gioco')
-            
-            giocatore_attivo.punteggio -= 500
-            giocatore_attivo.save()
-            
-            if lettera in partita.lettere_chiamate:
-                 request.session['messaggio'] = "Vocale già chiamata!"
+        # --- GESTIONE SOLUZIONE ---
+        if tipo == 'soluzione':
+            soluzione = request.POST.get('soluzione_input', '').upper().strip()
+            if soluzione == partita.frase_corrente.testo.upper():
+                request.session['round_vinto'] = True
+                request.session['messaggio'] = f"GRANDIOSO! {giocatore_attivo.nome} HA VINTO IL ROUND!"
+                # I soldi del round vanno nel totale
+                giocatore_attivo.punteggio += giocatore_attivo.montepremi_round
+                giocatore_attivo.save()
             else:
-                partita.lettere_chiamate += lettera
+                request.session['messaggio'] = "Soluzione ERRATA! Perdi tutto il montepremi del round e il turno."
+                giocatore_attivo.montepremi_round = 0
+                giocatore_attivo.save()
+                partita.turno_corrente = (partita.turno_corrente + 1) % len(giocatori)
                 partita.save()
+                request.session['valore_ruota'] = 0
+
+        # --- GESTIONE LETTERA (Consonante o Vocale) ---
+        elif tipo == 'lettera':
+            lettera = request.POST.get('lettera_input', '').upper().strip()
+            vocali = "AEIOU"
+
+            # Check 1: Lettera Vuota
+            if not lettera:
+                return redirect('gioco')
+
+            # Check 2: Lettera già chiamata
+            if lettera in partita.lettere_chiamate:
+                request.session['messaggio'] = f"La lettera '{lettera}' è già stata detta! PASSI IL TURNO."
+                partita.turno_corrente = (partita.turno_corrente + 1) % len(giocatori)
+                partita.save()
+                request.session['valore_ruota'] = 0
+                return redirect('gioco')
+
+            # LOGICA VOCALE
+            if lettera in vocali:
+                if giocatore_attivo.montepremi_round < 500:
+                    request.session['messaggio'] = "Non hai 500€ per la vocale!"
+                    return redirect('gioco')
                 
-                if lettera not in partita.frase_corrente.testo.upper():
+                # Pagamento vocale
+                giocatore_attivo.montepremi_round -= 500
+                giocatore_attivo.save()
+                partita.lettere_chiamate += lettera
+                
+                if lettera in partita.frase_corrente.testo.upper():
+                    request.session['messaggio'] = f"VOCALE '{lettera}' PRESENTE! Tieni il turno."
+                    # NON CAMBIA IL TURNO
+                else:
                     request.session['messaggio'] = f"La vocale '{lettera}' non c'è. Cambio turno."
                     partita.turno_corrente = (partita.turno_corrente + 1) % len(giocatori)
-                    partita.save()
-                else:
-                    request.session['messaggio'] = f"VOCALE COMPRATA: '{lettera}' è presente!"
+                
+                partita.save()
 
-        else: 
-            # CHIAMA CONSONANTE
-            if valore_ruota == 0:
-                 request.session['messaggio'] = "Devi girare la ruota!"
-                 return redirect('gioco')
-
-            if lettera in partita.lettere_chiamate:
-                request.session['messaggio'] = "Lettera già chiamata!"
+            # LOGICA CONSONANTE
             else:
+                # Se non ha girato la ruota o ha beccato pass/bancarotta
+                if valore_ruota == 0 or valore_ruota in ['PASSA', 'BANCAROTTA']:
+                    request.session['messaggio'] = "Devi girare la ruota!"
+                    return redirect('gioco')
+
                 partita.lettere_chiamate += lettera
                 occorrenze = partita.frase_corrente.testo.upper().count(lettera)
-                
+
                 if occorrenze > 0:
                     try:
                         vincita = int(valore_ruota) * occorrenze
-                        giocatore_attivo.punteggio += vincita
+                        giocatore_attivo.montepremi_round += vincita
                         giocatore_attivo.save()
-                        request.session['messaggio'] = f"Sì! {occorrenze} '{lettera}'. Hai vinto {vincita}€."
-                    except ValueError:
-                        pass
+                        request.session['messaggio'] = f"SI! Ci sono {occorrenze} '{lettera}'. Vinci {vincita}€. GIRA ANCORA!"
+                        # IMPORTANTE: NON CAMBIAMO TURNO QUI
+                        # Resettiamo la ruota perché deve rigirare
+                        request.session['valore_ruota'] = 0 
+                    except ValueError: pass
                 else:
-                    request.session['messaggio'] = f"La lettera '{lettera}' non c'è. Cambio turno."
+                    request.session['messaggio'] = f"La lettera '{lettera}' NON c'è. Cambio turno."
                     partita.turno_corrente = (partita.turno_corrente + 1) % len(giocatori)
-                    partita.save()
+                    request.session['valore_ruota'] = 0 
                 
                 partita.save()
-                request.session['valore_ruota'] = 0 # Reset ruota
 
-    elif tipo == 'soluzione':
-        tentativo = request.POST.get('soluzione_input', '').upper().strip()
-        soluzione_reale = partita.frase_corrente.testo.upper().strip()
-        
-        if tentativo == soluzione_reale:
-            # VITTORIA!
-            partita.vincitore = giocatore_attivo.nome 
-            # RIMOSSO: partita.lettere_chiamate = "TUTTE"  <-- Questa riga va cancellata!
-            partita.save()
-            request.session['messaggio'] = f"CAMPIONE! {giocatore_attivo.nome} ha indovinato la frase!"
-            request.session['round_vinto'] = True 
-        else:
-            # ERRORE
-            request.session['messaggio'] = f"No! '{tentativo}' è sbagliata! Cambio turno."
+        # --- GESTIONE TIMEOUT ---
+        elif tipo == 'tempo_scaduto':
+            request.session['messaggio'] = "TEMPO SCADUTO! Cambio turno."
             partita.turno_corrente = (partita.turno_corrente + 1) % len(giocatori)
             partita.save()
+            request.session['valore_ruota'] = 0
 
     return redirect('gioco')
 
@@ -321,38 +310,40 @@ def azione_gioco(request):
 
 def prossimo_round(request):
     partita_id = request.session.get('partita_id')
-    if not partita_id: return redirect('setup_partita')
-    partita = get_object_or_404(Partita, id=request.session['partita_id'])
-
-    # Reset Montepremi Round per tutti (Sicurezza)
-    for g in partita.giocatori.all():
-        g.montepremi_round = 0
-        g.save()
+    partita = get_object_or_404(Partita, id=partita_id)
     
-    # CONTROLLO FINE GIOCO
-    if partita.numero_round >= partita.totale_rounds:
-        return redirect('fine_partita')
-    
-    # Se non è finito, incrementa round
+    # Reset variabili per il nuovo round
     partita.numero_round += 1
     
-    # Prende una nuova frase
-    nuova_frase = Frase.objects.exclude(id=partita.frase_corrente.id).order_by('?').first()
-    if not nuova_frase:
-         request.session['messaggio'] = "Frasi finite! Ricarica il DB."
-         return redirect('gioco')
-
-    # Reset per nuovo round
-    partita.frase_corrente = nuova_frase
+    # BUG FIX: Reset del turno al primo giocatore o al vincitore (qui mettiamo 0 per semplicità)
+    # Oppure: (partita.turno_corrente + 1) % n se vuoi ruotare chi inizia
+    partita.turno_corrente = 0 
+    
     partita.lettere_chiamate = ""
-    partita.vincitore = None # Nessuno ha vinto ancora questo round specifico
-    partita.save()
     
-    request.session['valore_ruota'] = 0
-    request.session['round_vinto'] = False
-    request.session['messaggio'] = f"Siamo al Round {partita.numero_round} di {partita.totale_rounds}!"
+    # Nuova frase
+    frasi_usate_ids = request.session.get('frasi_usate', [])
+    if partita.frase_corrente:
+        frasi_usate_ids.append(partita.frase_corrente.id)
     
-    return redirect('gioco')
+    nuova_frase = Frase.objects.exclude(id__in=frasi_usate_ids).order_by('?').first()
+    
+    if nuova_frase and partita.numero_round <= partita.totale_rounds:
+        partita.frase_corrente = nuova_frase
+        partita.save()
+        request.session['frasi_usate'] = frasi_usate_ids
+        request.session['round_vinto'] = False
+        request.session['valore_ruota'] = 0
+        request.session['messaggio'] = f"Inizia il Round {partita.numero_round}!"
+        
+        # Reset montepremi parziale dei giocatori
+        for g in partita.giocatori.all():
+            g.montepremi_round = 0
+            g.save()
+            
+        return redirect('gioco')
+    else:
+        return redirect('fine_partita')
 
 def fine_partita(request):
     partita_id = request.session.get('partita_id')
