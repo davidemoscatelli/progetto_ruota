@@ -1,183 +1,119 @@
 {% load static %}
 <!DOCTYPE html>
-<html lang="it" data-bs-theme="dark"> <head>
+<html lang="it" data-bs-theme="dark">
+<head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0, user-scalable=no">
-    <title>La Ruota</title>
+    <title>La Ruota - Gioco</title>
     <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/css/bootstrap.min.css" rel="stylesheet">
     <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/animate.css/4.1.1/animate.min.css"/>
     
     <style>
-        /* --- PALETTE COLORI PREMIUM & VARIABILI --- */
+        /* --- THEME VARIABLES --- */
         :root {
-            --bg-main: #121212;      /* Nero profondo */
-            --bg-secondary: #1e1e24; /* Grigio scuro per card e barre */
-            --bg-tertiary: #2a2a35;  /* Grigio per elementi interattivi */
-            --accent-gold: #d4af37;  /* Oro elegante */
-            --accent-gold-hover: #b39ddb; /* Oro leggermente più scuro per hover */
+            --bg-main: #121212;
+            --bg-secondary: #1e1e24;
+            --bg-tertiary: #2a2a35;
+            --accent-gold: #d4af37;
             --text-primary: #ffffff;
             --text-secondary: #a0a0a0;
-            --success-muted: #2e7d32; /* Verde meno acido */
-            --danger-muted: #c62828;  /* Rosso meno acido */
+            --tile-empty-bg: #2c2c35; 
+            --tile-empty-border: #555555;
+            --success-muted: #2e7d32;
+            --danger-muted: #c62828;
             --border-radius-lg: 16px;
-            --shadow-subtle: 0 4px 20px rgba(0,0,0,0.3);
         }
 
         body {
-            background-color: var(--bg-main);
-            color: var(--text-primary);
-            font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Helvetica, Arial, sans-serif; /* Font di sistema puliti */
-            padding-top: 80px; /* Spazio per header fisso */
-            overflow-x: hidden;
+            background-color: var(--bg-main); color: var(--text-primary);
+            font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif;
+            padding-top: 80px; overflow-x: hidden;
         }
 
-        /* --- HEADER / SCOREBOARD FISSO --- */
+        /* --- HEADER --- */
         .scoreboard-bar {
             position: fixed; top: 0; left: 0; width: 100%; height: 70px;
-            background: rgba(30, 30, 36, 0.95); /* bg-secondary con trasparenza */
-            backdrop-filter: blur(10px);
-            border-bottom: 1px solid rgba(212, 175, 55, 0.3); /* Linea oro sottile */
-            z-index: 1000;
+            background: rgba(30, 30, 36, 0.95); backdrop-filter: blur(10px);
+            border-bottom: 1px solid rgba(212, 175, 55, 0.3); z-index: 1000;
             display: flex; align-items: center; justify-content: center; gap: 15px;
-            padding: 0 15px; overflow-x: auto;
-            box-shadow: var(--shadow-subtle);
+            padding: 0 15px; overflow-x: auto; box-shadow: 0 4px 15px rgba(0,0,0,0.4);
         }
-
         .round-badge {
             background: var(--bg-main); color: var(--accent-gold);
             border: 1px solid var(--accent-gold); font-weight: 600;
             padding: 5px 12px; border-radius: 20px; white-space: nowrap;
         }
-
         .player-pill {
-            /* background: transparent; */
-            border-radius: 12px; padding: 5px 15px;
-            display: flex; flex-direction: column; align-items: center; min-width: 90px;
-            transition: all 0.3s ease;
-            border: 1px solid transparent;
-            color: var(--text-secondary);
+            border-radius: 12px; padding: 5px 15px; min-width: 90px;
+            display: flex; flex-direction: column; align-items: center; 
+            color: var(--text-secondary); transition: 0.3s;
         }
         .player-pill.active {
-            background: var(--bg-tertiary);
-            border-color: var(--accent-gold);
-            color: var(--text-primary);
-            transform: translateY(-2px);
+            background: var(--bg-tertiary); border-color: var(--accent-gold);
+            color: var(--text-primary); transform: translateY(-2px); border: 1px solid var(--accent-gold);
         }
         .player-name { font-size: 0.75rem; font-weight: 600; text-transform: uppercase; letter-spacing: 1px;}
         .player-score { font-size: 1.1rem; font-weight: 700; color: var(--accent-gold); line-height: 1.1; }
-        .player-total { font-size: 0.7rem; opacity: 0.7; }
 
-        /* --- LAYOUT PRINCIPALE --- */
-        .game-container {
-            max-width: 1100px; margin: 0 auto; padding: 20px;
-        }
-        .game-grid {
-            display: grid; grid-template-columns: 1fr 320px; gap: 30px;
-            align-items: start;
-        }
-        @media (max-width: 992px) { .game-grid { grid-template-columns: 1fr; gap: 40px; } } /* Mobile stack */
+        /* --- LAYOUT --- */
+        .game-container { max-width: 1100px; margin: 0 auto; padding: 20px; }
+        .game-grid { display: grid; grid-template-columns: 1fr 320px; gap: 30px; align-items: start; }
+        @media (max-width: 992px) { .game-grid { grid-template-columns: 1fr; gap: 40px; } }
 
-        /* --- INFO FRASE (Minimal) --- */
-        .hint-category {
-            text-transform: uppercase; letter-spacing: 2px; font-weight: 600;
-            color: var(--text-secondary); font-size: 0.9rem; margin-bottom: 5px;
-        }
-        .hint-text {
-            font-size: 1.2rem; color: var(--text-primary); font-weight: 500;
-        }
-
-        /* --- TABELLONE (Pulito) --- */
+        /* --- BOARD --- */
         .board-container {
-            background: var(--bg-secondary);
-            padding: 25px; border-radius: var(--border-radius-lg);
+            background: var(--bg-secondary); padding: 25px; border-radius: var(--border-radius-lg);
             display: flex; flex-wrap: wrap; justify-content: center; gap: 12px;
-            box-shadow: var(--shadow-subtle); margin: 25px 0;
-            border: 1px solid rgba(255,255,255,0.05); /* Bordo impercettibile */
+            box-shadow: 0 4px 20px rgba(0,0,0,0.3); margin: 25px 0; border: 1px solid rgba(255,255,255,0.05);
         }
         .word-wrapper { display: flex; flex-wrap: nowrap; margin-right: 25px; margin-bottom: 12px; }
         .tile {
-            width: 40px; height: 55px;
-            background: #e0e0e0; /* Bianco sporco per meno contrasto */
-            color: #121212;
-            font-size: 30px; font-weight: 700; display: flex; align-items: center; justify-content: center;
-            border-radius: 6px; margin-right: 3px;
-            box-shadow: 0 3px 0 #a0a0a0; /* Effetto 3D sottile */
+            width: 42px; height: 58px; font-size: 32px; font-weight: 700;
+            display: flex; align-items: center; justify-content: center;
+            border-radius: 6px; margin-right: 4px;
         }
+        .tile-filled { background: #e0e0e0; color: #121212; box-shadow: 0 4px 0 #999; }
+        
+        /* Casella vuota: SENZA PUNTINO ma visibile */
         .tile-empty {
-            background: rgba(255,255,255,0.03);
-            border: 2px solid rgba(255,255,255,0.1);
-            box-shadow: none;
-        }
-        .tile-success {
-            background: var(--success-muted); color: white; box-shadow: 0 3px 0 #1b5e20; border: none;
-        }
-
-        /* --- CARD CONTROLLI --- */
-        .controls-card {
-            background: var(--bg-secondary); border-radius: var(--border-radius-lg);
-            padding: 25px; box-shadow: var(--shadow-subtle);
-            border: 1px solid rgba(255,255,255,0.05);
+            background: var(--tile-empty-bg);
+            border: 2px solid var(--tile-empty-border);
+            box-shadow: inset 0 2px 4px rgba(0,0,0,0.5);
         }
         
-        /* Timer Bar Minimal */
+        .tile-success { background: var(--success-muted); color: white; box-shadow: 0 4px 0 #1b5e20; }
+
+        /* --- CONTROLS --- */
+        .controls-card {
+            background: var(--bg-secondary); border-radius: var(--border-radius-lg);
+            padding: 25px; box-shadow: 0 4px 20px rgba(0,0,0,0.3); border: 1px solid rgba(255,255,255,0.05);
+        }
+        .hint-category { text-transform: uppercase; letter-spacing: 2px; color: var(--text-secondary); font-size: 0.9rem; margin-bottom: 5px; }
+        .hint-text { font-size: 1.2rem; color: var(--text-primary); font-weight: 500; }
+
+        /* Buttons & Forms */
+        .btn-gold-accent { background-color: var(--accent-gold); color: var(--bg-main); font-weight: 700; border: none; padding: 12px; border-radius: 8px; letter-spacing: 1px; }
+        .btn-gold-accent:hover:not([disabled]) { background-color: #c39f30; color: var(--bg-main);}
+        .btn-outline-gold { border: 2px solid var(--accent-gold); color: var(--accent-gold); font-weight: 600; background: transparent; padding: 10px; border-radius: 8px; }
+        .btn-outline-gold:hover { background: rgba(212, 175, 55, 0.1); color: var(--accent-gold); }
+        .btn-solve-action { background-color: var(--success-muted); color: white; font-weight: 700; border: none; padding: 12px; border-radius: 8px; letter-spacing: 1px; }
+        .form-control-dark { background-color: var(--bg-main); border: 2px solid var(--bg-tertiary); color: var(--accent-gold); }
+        .form-control-dark:focus { background-color: var(--bg-main); border-color: var(--accent-gold); color: var(--accent-gold); box-shadow: none; }
+        
+        /* Timer */
         #timer-bar-container { height: 4px; background: var(--bg-main); border-radius: 2px; margin-bottom: 20px; overflow: hidden;}
         #timer-bar { height: 100%; background: var(--accent-gold); width: 100%; transition: width 1s linear; }
         #timer-bar.danger { background: var(--danger-muted); }
 
-        /* --- BOTTONI CUSTOM ELEGANTI --- */
-        .btn-gold-accent {
-            background-color: var(--accent-gold); color: var(--bg-main);
-            font-weight: 700; border: none; letter-spacing: 1px;
-            padding: 12px; border-radius: 8px;
-        }
-        .btn-gold-accent:hover:not([disabled]) { background-color: #c39f30; color: var(--bg-main);}
-        
-        .btn-outline-gold {
-            border: 2px solid var(--accent-gold); color: var(--accent-gold); font-weight: 600; background: transparent;
-             padding: 10px; border-radius: 8px;
-        }
-        .btn-outline-gold:hover { background: rgba(212, 175, 55, 0.1); color: var(--accent-gold); }
-
-        .btn-solve-action {
-            background-color: var(--success-muted); color: white; font-weight: 700; border: none;
-             padding: 12px; border-radius: 8px; letter-spacing: 1px;
-        }
-        .btn-solve-action:hover { background-color: #256628; color: white; }
-
-        .form-control-dark {
-            background-color: var(--bg-main); border: 2px solid var(--bg-tertiary); color: var(--accent-gold);
-        }
-        .form-control-dark:focus {
-            background-color: var(--bg-main); border-color: var(--accent-gold); color: var(--accent-gold); box-shadow: none;
-        }
-        .form-control-dark::placeholder { color: var(--text-secondary); opacity: 0.5; }
-
-
-        /* --- RUOTA --- */
+        /* Wheel */
         .wheel-container { position: relative; width: 300px; height: 300px; margin: 0 auto; }
-        .wheel-border-accent {
-            position: absolute; top: -5px; left: -5px; right: -5px; bottom: -5px;
-            border-radius: 50%; border: 3px solid var(--accent-gold); /* Bordo Oro esterno */
-            pointer-events: none;
-        }
+        .wheel-border-accent { position: absolute; top: -5px; left: -5px; right: -5px; bottom: -5px; border-radius: 50%; border: 3px solid var(--accent-gold); pointer-events: none; }
         .wheel-image { width: 100%; height: 100%; object-fit: cover; border-radius: 50%; transition: transform 4s cubic-bezier(0.1, 0.7, 0.1, 1); }
-        /* Pointer più sobrio */
-        .pointer-arrow {
-            position: absolute; top: -10px; left: 50%; transform: translateX(-50%);
-            width: 0; height: 0;
-            border-left: 12px solid transparent; border-right: 12px solid transparent;
-            border-top: 25px solid var(--danger-muted); /* Rosso meno acceso */
-            z-index: 10; filter: drop-shadow(0 2px 2px rgba(0,0,0,0.5));
-        }
+        .pointer-arrow { position: absolute; top: -10px; left: 50%; transform: translateX(-50%); width: 0; height: 0; border-left: 12px solid transparent; border-right: 12px solid transparent; border-top: 25px solid var(--danger-muted); z-index: 10; filter: drop-shadow(0 2px 2px rgba(0,0,0,0.5)); }
         .spin-val { font-size: 1.3rem; color: var(--accent-gold); font-weight: 700; text-align: center; margin-top: 15px; letter-spacing: 1px;}
 
-        /* --- OVERLAY SOLUZIONE (Minimal) --- */
-        #solve-overlay {
-            display: none; position: fixed; top: 0; left: 0; width: 100%; height: 100%;
-            background: rgba(18, 18, 18, 0.95); /* bg-main con alta opacità */
-            backdrop-filter: blur(5px); z-index: 2000;
-            align-items: center; justify-content: center; flex-direction: column;
-        }
+        /* Overlay */
+        #solve-overlay { display: none; position: fixed; top: 0; left: 0; width: 100%; height: 100%; background: rgba(18, 18, 18, 0.95); backdrop-filter: blur(5px); z-index: 2000; align-items: center; justify-content: center; flex-direction: column; }
     </style>
 </head>
 <body>
@@ -188,13 +124,12 @@
     <div class="player-pill {% if g.id == giocatore_corrente.id %}active{% endif %}">
         <span class="player-name">{{ g.nome }}</span>
         <span class="player-score">{{ g.montepremi_round }}€</span>
-        </div>
+    </div>
     {% endfor %}
 </div>
 
 <div class="game-container">
     <div class="game-grid">
-        
         <div>
             <div class="text-center mb-4">
                 <div class="hint-category">{{ partita.frase_corrente.categoria.nome }}</div>
@@ -209,7 +144,7 @@
                             <div class="tile tile-success animate__animated animate__flipInX">{{ casella.char }}</div>
                         {% else %}
                             {% if casella.visibile %}
-                                <div class="tile animate__animated animate__fadeIn">{{ casella.char }}</div>
+                                <div class="tile tile-filled animate__animated animate__fadeIn">{{ casella.char }}</div>
                             {% else %}
                                 <div class="tile tile-empty"></div>
                             {% endif %}
@@ -220,56 +155,38 @@
             </div>
 
             {% if messaggio %}
-            <div class="alert alert-dark border-secondary text-center fw-medium p-2 mb-4 animate__animated animate__fadeIn" style="color: var(--accent-gold);">
-                {{ messaggio }}
-            </div>
+            <div class="alert alert-dark border-secondary text-center fw-medium p-2 mb-4 animate__animated animate__fadeIn" style="color: var(--accent-gold);">{{ messaggio }}</div>
             {% endif %}
 
             {% if request.session.round_vinto %}
             <div class="text-center mt-5">
                 <h2 class="text-success animate__animated animate__fadeInUp mb-3">ROUND COMPLETATO</h2>
                 <h4 class="text-white mb-5 fw-light">"{{ partita.frase_corrente.testo }}"</h4>
-                <a href="{% url 'prossimo_round' %}" class="btn btn-gold-accent btn-lg px-5 shadow-sm">
-                    PROSSIMO ROUND &rarr;
-                </a>
+                <a href="{% url 'prossimo_round' %}" class="btn btn-gold-accent btn-lg px-5 shadow-sm">PROSSIMO ROUND &rarr;</a>
             </div>
             {% else %}
             
             <div class="controls-card mt-4" id="standard-controls">
-                <div id="timer-bar-container">
-                    <div id="timer-bar"></div>
-                </div>
-                
+                <div id="timer-bar-container"><div id="timer-bar"></div></div>
                 <h6 class="text-secondary text-center mb-4 text-uppercase" style="letter-spacing: 1px;">Turno di: <span style="color: var(--text-primary);">{{ giocatore_corrente.nome }}</span></h6>
 
                 <div class="row g-3">
                     <div class="col-12">
-                        <button id="btnGira" class="btn btn-gold-accent w-100 py-3 text-uppercase shadow-sm"
-                        {% if valore_ruota != 0 and valore_ruota != 'BANCAROTTA' and valore_ruota != 'PASSA' %}disabled{% endif %}>
-                            GIRA LA RUOTA
-                        </button>
+                        <button id="btnGira" class="btn btn-gold-accent w-100 py-3 text-uppercase shadow-sm" {% if valore_ruota != 0 and valore_ruota != 'BANCAROTTA' and valore_ruota != 'PASSA' %}disabled{% endif %}>GIRA LA RUOTA</button>
                     </div>
-                    
                     <div class="col-8">
                         <form action="{% url 'azione_gioco' %}" method="POST" class="d-flex gap-2 h-100">
                             {% csrf_token %}
                             <input type="hidden" name="tipo" value="lettera">
-                            <input type="text" name="lettera_input" class="form-control form-control-dark form-control-lg text-center fw-bold text-uppercase h-100" placeholder="CONSONANTE" maxlength="1" required 
-                            {% if valore_ruota == 0 or valore_ruota == 'BANCAROTTA' or valore_ruota == 'PASSA' %}disabled{% endif %}>
+                            <input type="text" name="lettera_input" class="form-control form-control-dark form-control-lg text-center fw-bold text-uppercase h-100" placeholder="CONSONANTE" maxlength="1" required {% if valore_ruota == 0 or valore_ruota == 'BANCAROTTA' or valore_ruota == 'PASSA' %}disabled{% endif %}>
                             <button class="btn btn-outline-gold h-100 px-3" type="submit" {% if valore_ruota == 0 or valore_ruota == 'BANCAROTTA' or valore_ruota == 'PASSA' %}disabled{% endif %}>OK</button>
                         </form>
                     </div>
-
                     <div class="col-4">
-                        <button type="button" class="btn btn-outline-danger w-100 h-100 fw-bold border-2" onclick="promptVocale()" style="color: #ef5350; border-color: #ef5350;">
-                            VOCALE<br><small style="opacity: 0.8;">500€</small>
-                        </button>
+                        <button type="button" class="btn btn-outline-danger w-100 h-100 fw-bold border-2" onclick="promptVocale()" style="color: #ef5350; border-color: #ef5350;">VOCALE<br><small style="opacity: 0.8;">500€</small></button>
                     </div>
-                    
                     <div class="col-12 mt-2">
-                        <button class="btn btn-solve-action w-100 py-2 text-uppercase shadow-sm" onclick="attivaSoluzione()">
-                            ✋ TENTO LA SOLUZIONE
-                        </button>
+                        <button class="btn btn-solve-action w-100 py-2 text-uppercase shadow-sm" onclick="attivaSoluzione()">✋ TENTO LA SOLUZIONE</button>
                     </div>
                 </div>
             </div>
@@ -279,12 +196,11 @@
         {% if not request.session.round_vinto %}
         <div class="d-flex flex-column align-items-center justify-content-start mt-4 mt-lg-0">
             <div class="wheel-container">
-                <div class="wheel-border-accent"></div> <div class="pointer-arrow"></div>
+                <div class="wheel-border-accent"></div>
+                <div class="pointer-arrow"></div>
                 <img src="{% static 'game/images/ruota.png' %}" class="wheel-image" id="wheelImg" alt="Ruota">
             </div>
-            <div class="spin-val" id="resultLabel">
-                {% if valore_ruota == 0 %}GIRA!{% else %}{{ valore_ruota }}{% endif %}
-            </div>
+            <div class="spin-val" id="resultLabel">{% if valore_ruota == 0 %}GIRA!{% else %}{{ valore_ruota }}{% endif %}</div>
         </div>
         {% endif %}
     </div>
@@ -303,87 +219,33 @@
     </form>
 </div>
 
-<form action="{% url 'azione_gioco' %}" method="POST" id="formVocaleReale" style="display:none;">
-    {% csrf_token %}
-    <input type="hidden" name="tipo" value="lettera">
-    <input type="hidden" name="lettera_input" id="vocaleInputReal">
-</form>
-<form action="{% url 'azione_gioco' %}" method="POST" id="formTimeout" style="display:none;">
-    {% csrf_token %}
-    <input type="hidden" name="tipo" value="tempo_scaduto">
-</form>
+<form action="{% url 'azione_gioco' %}" method="POST" id="formVocaleReale" style="display:none;">{% csrf_token %}<input type="hidden" name="tipo" value="lettera"><input type="hidden" name="lettera_input" id="vocaleInputReal"></form>
+<form action="{% url 'azione_gioco' %}" method="POST" id="formTimeout" style="display:none;">{% csrf_token %}<input type="hidden" name="tipo" value="tempo_scaduto"></form>
 
 <script>
-    let currentRotation = 0;
-    let timerInterval;
-    let timeLeft = 30;
+    let currentRotation = 0; let timerInterval; let timeLeft = 30;
     const isRoundWon = "{{ request.session.round_vinto }}" === "True";
-    
     function startTimer() {
         if(isRoundWon) return;
         const bar = document.getElementById('timer-bar');
         clearInterval(timerInterval);
         timerInterval = setInterval(() => {
             timeLeft--;
-            if(bar) {
-                bar.style.width = (timeLeft / 30 * 100) + "%";
-                // Cambio colore barra quando manca poco
-                if(timeLeft < 10) bar.classList.add('danger'); else bar.classList.remove('danger');
-            }
-            if (timeLeft <= 0) {
-                clearInterval(timerInterval);
-                document.getElementById('formTimeout').submit();
-            }
+            if(bar) { bar.style.width = (timeLeft / 30 * 100) + "%"; if(timeLeft < 10) bar.classList.add('danger'); else bar.classList.remove('danger'); }
+            if (timeLeft <= 0) { clearInterval(timerInterval); document.getElementById('formTimeout').submit(); }
         }, 1000);
     }
     function stopTimer() { clearInterval(timerInterval); }
     startTimer();
-
     const savedRot = sessionStorage.getItem('wheelRotation');
-    if (savedRot) {
-        currentRotation = parseFloat(savedRot);
-        const w = document.getElementById('wheelImg');
-        if(w) { w.style.transition = 'none'; w.style.transform = `rotate(${currentRotation}deg)`; }
-    }
-
+    if (savedRot) { currentRotation = parseFloat(savedRot); const w = document.getElementById('wheelImg'); if(w) { w.style.transition = 'none'; w.style.transform = `rotate(${currentRotation}deg)`; } }
     const btnGira = document.getElementById('btnGira');
-    if(btnGira) {
-        btnGira.addEventListener('click', () => {
-            stopTimer();
-            btnGira.disabled = true;
-            document.getElementById('resultLabel').innerText = "...";
-            fetch("{% url 'api_gira_ruota' %}")
-            .then(r => r.json())
-            .then(data => {
-                const target = data.gradi_finali;
-                const currentMod = currentRotation % 360;
-                let dist = target - currentMod;
-                if(dist < 0) dist += 360;
-                currentRotation += (360 * 5) + dist;
-                const w = document.getElementById('wheelImg');
-                w.style.transition = 'transform 4s cubic-bezier(0.1, 0.7, 0.1, 1)';
-                w.style.transform = `rotate(${currentRotation}deg)`;
-                setTimeout(() => {
-                    sessionStorage.setItem('wheelRotation', currentRotation);
-                    window.location.reload();
-                }, 4000);
-            });
-        });
-    }
-
+    if(btnGira) { btnGira.addEventListener('click', () => { stopTimer(); btnGira.disabled = true; document.getElementById('resultLabel').innerText = "..."; fetch("{% url 'api_gira_ruota' %}") .then(r => r.json()) .then(data => { const target = data.gradi_finali; const currentMod = currentRotation % 360; let dist = target - currentMod; if(dist < 0) dist += 360; currentRotation += (360 * 5) + dist; const w = document.getElementById('wheelImg'); w.style.transition = 'transform 4s cubic-bezier(0.1, 0.7, 0.1, 1)'; w.style.transform = `rotate(${currentRotation}deg)`; setTimeout(() => { sessionStorage.setItem('wheelRotation', currentRotation); window.location.reload(); }, 4000); }); }); }
     function attivaSoluzione() { stopTimer(); document.getElementById('solve-overlay').style.display = 'flex'; }
     function chiudiSoluzione() { document.getElementById('solve-overlay').style.display = 'none'; startTimer(); }
-    function promptVocale() {
-        stopTimer();
-        let l = prompt("Inserisci la vocale (A, E, I, O, U):");
-        if(l) {
-            document.getElementById('vocaleInputReal').value = l;
-            document.getElementById('formVocaleReale').submit();
-        } else { startTimer(); }
-    }
+    function promptVocale() { stopTimer(); let l = prompt("Inserisci la vocale (A, E, I, O, U):"); if(l) { document.getElementById('vocaleInputReal').value = l; document.getElementById('formVocaleReale').submit(); } else { startTimer(); } }
     document.querySelectorAll('form').forEach(f => f.addEventListener('submit', stopTimer));
 </script>
-
 <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/js/bootstrap.bundle.min.js"></script>
 </body>
 </html>
