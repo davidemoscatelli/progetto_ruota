@@ -84,99 +84,110 @@ def azione_gioco(request):
     partita_id = request.session.get('partita_id')
     partita = get_object_or_404(Partita, id=partita_id)
     giocatori = partita.giocatori.all()
+    
+    # FIX INDICI: Se l'indice è fuori scala, resetta a 0
+    if partita.turno_corrente >= len(giocatori):
+        partita.turno_corrente = 0
+        partita.save()
+        
     giocatore_attivo = giocatori[partita.turno_corrente]
     
     if request.method == 'POST':
         tipo = request.POST.get('tipo')
         valore_ruota = request.session.get('valore_ruota', 0)
+        vocali = "AEIOU"
 
-        # --- GESTIONE SOLUZIONE ---
+        # --- CASO 1: TIMEOUT ---
+        if tipo == 'tempo_scaduto':
+            request.session['messaggio'] = f"⏰ TEMPO SCADUTO! Tocca al prossimo."
+            request.session['valore_ruota'] = 0
+            partita.turno_corrente = (partita.turno_corrente + 1) % len(giocatori)
+            partita.save()
+            return redirect('gioco')
+
+        # --- CASO 2: TENTATIVO SOLUZIONE ---
         if tipo == 'soluzione':
             soluzione = request.POST.get('soluzione_input', '').upper().strip()
             if soluzione == partita.frase_corrente.testo.upper():
                 request.session['round_vinto'] = True
-                request.session['messaggio'] = f"GRANDIOSO! {giocatore_attivo.nome} HA VINTO IL ROUND!"
-                # I soldi del round vanno nel totale
+                request.session['messaggio'] = f"🏆 {giocatore_attivo.nome} HA VINTO IL ROUND!"
                 giocatore_attivo.punteggio += giocatore_attivo.montepremi_round
                 giocatore_attivo.save()
             else:
-                request.session['messaggio'] = "Soluzione ERRATA! Perdi tutto il montepremi del round e il turno."
+                request.session['messaggio'] = f"❌ Soluzione errata! Perdi turno e montepremi parziale."
                 giocatore_attivo.montepremi_round = 0
                 giocatore_attivo.save()
                 partita.turno_corrente = (partita.turno_corrente + 1) % len(giocatori)
                 partita.save()
                 request.session['valore_ruota'] = 0
+            return redirect('gioco')
 
-        # --- GESTIONE LETTERA (Consonante o Vocale) ---
+        # --- CASO 3: LETTERA (Consonante o Vocale) ---
         elif tipo == 'lettera':
             lettera = request.POST.get('lettera_input', '').upper().strip()
-            vocali = "AEIOU"
-
-            # Check 1: Lettera Vuota
-            if not lettera:
+            
+            # Validazione base
+            if not lettera or len(lettera) > 1 or not lettera.isalpha():
                 return redirect('gioco')
 
-            # Check 2: Lettera già chiamata
+            # Lettera già detta? -> CAMBIO TURNO
             if lettera in partita.lettere_chiamate:
-                request.session['messaggio'] = f"La lettera '{lettera}' è già stata detta! PASSI IL TURNO."
+                request.session['messaggio'] = f"⚠️ La lettera '{lettera}' è già uscita! Passi il turno."
                 partita.turno_corrente = (partita.turno_corrente + 1) % len(giocatori)
-                partita.save()
                 request.session['valore_ruota'] = 0
+                partita.save()
                 return redirect('gioco')
 
-            # LOGICA VOCALE
-            if lettera in vocali:
+            is_vocale = lettera in vocali
+
+            # --- A) È UNA VOCALE ---
+            if is_vocale:
                 if giocatore_attivo.montepremi_round < 500:
-                    request.session['messaggio'] = "Non hai 500€ per la vocale!"
+                    request.session['messaggio'] = "🚫 Non hai 500€ per la vocale!"
                     return redirect('gioco')
                 
-                # Pagamento vocale
+                # Pagamento
                 giocatore_attivo.montepremi_round -= 500
                 giocatore_attivo.save()
                 partita.lettere_chiamate += lettera
                 
                 if lettera in partita.frase_corrente.testo.upper():
-                    request.session['messaggio'] = f"VOCALE '{lettera}' PRESENTE! Tieni il turno."
+                    request.session['messaggio'] = f"✅ VOCALE TROVATA! Continua a giocare."
                     # NON CAMBIA IL TURNO
                 else:
-                    request.session['messaggio'] = f"La vocale '{lettera}' non c'è. Cambio turno."
+                    request.session['messaggio'] = f"❌ La vocale '{lettera}' non c'è. Cambio turno."
                     partita.turno_corrente = (partita.turno_corrente + 1) % len(giocatori)
                 
                 partita.save()
 
-            # LOGICA CONSONANTE
+            # --- B) È UNA CONSONANTE ---
             else:
-                # Se non ha girato la ruota o ha beccato pass/bancarotta
+                # Obbligo giro ruota
                 if valore_ruota == 0 or valore_ruota in ['PASSA', 'BANCAROTTA']:
-                    request.session['messaggio'] = "Devi girare la ruota!"
+                    request.session['messaggio'] = "🌀 Devi prima girare la ruota!"
                     return redirect('gioco')
 
                 partita.lettere_chiamate += lettera
                 occorrenze = partita.frase_corrente.testo.upper().count(lettera)
 
                 if occorrenze > 0:
+                    # LETTERA PRESENTE
                     try:
                         vincita = int(valore_ruota) * occorrenze
                         giocatore_attivo.montepremi_round += vincita
                         giocatore_attivo.save()
-                        request.session['messaggio'] = f"SI! Ci sono {occorrenze} '{lettera}'. Vinci {vincita}€. GIRA ANCORA!"
-                        # IMPORTANTE: NON CAMBIAMO TURNO QUI
-                        # Resettiamo la ruota perché deve rigirare
+                        request.session['messaggio'] = f"🎉 TROVATE {occorrenze} '{lettera}'! Vinci {vincita}€. GIRA ANCORA!"
+                        
+                        # Resetta la ruota (deve rigirare) ma NON CAMBIA TURNO
                         request.session['valore_ruota'] = 0 
                     except ValueError: pass
                 else:
-                    request.session['messaggio'] = f"La lettera '{lettera}' NON c'è. Cambio turno."
+                    # LETTERA ASSENTE
+                    request.session['messaggio'] = f"❌ La lettera '{lettera}' non c'è. Tocca al prossimo."
                     partita.turno_corrente = (partita.turno_corrente + 1) % len(giocatori)
                     request.session['valore_ruota'] = 0 
                 
                 partita.save()
-
-        # --- GESTIONE TIMEOUT ---
-        elif tipo == 'tempo_scaduto':
-            request.session['messaggio'] = "TEMPO SCADUTO! Cambio turno."
-            partita.turno_corrente = (partita.turno_corrente + 1) % len(giocatori)
-            partita.save()
-            request.session['valore_ruota'] = 0
 
     return redirect('gioco')
 
