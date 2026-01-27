@@ -1,0 +1,329 @@
+{% load static %}
+<!DOCTYPE html>
+<html lang="it">
+<head>
+    <meta charset="UTF-8">
+    <title>La Ruota della Fortuna</title>
+    <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/css/bootstrap.min.css" rel="stylesheet">
+    <style>
+        body { background-color: #1a1a2e; color: #fff; font-family: 'Arial', sans-serif; overflow-x: hidden; }
+        
+        /* STILE TABELLONE (Parole intere) */
+        .board-container {
+            background: #0f3460;
+            padding: 20px;
+            border-radius: 10px;
+            border: 4px solid #e94560;
+            display: flex;
+            flex-wrap: wrap; /* Le parole vanno a capo se non c'è spazio */
+            justify-content: center;
+            gap: 15px; /* Spazio verticale tra le righe */
+            min-height: 140px;
+            box-shadow: 0 0 20px rgba(233, 69, 96, 0.4);
+        }
+
+        .word-wrapper {
+            display: flex; /* Le lettere stanno in riga */
+            flex-wrap: nowrap; /* VIETATO spezzare la parola */
+            margin-right: 30px; /* Spazio destro tra le parole */
+        }
+
+        .tile { 
+            width: 45px; height: 60px; background: white; color: black; 
+            font-size: 32px; font-weight: bold; display: flex; align-items: center; justify-content: center; 
+            border-radius: 4px; margin-right: 2px; border: 2px solid #ccc;
+        }
+        .tile-empty { background: #16213e; border: 1px solid #fff; }
+        
+        /* BARRA SUGGERIMENTO */
+        .hint-bar {
+            background: linear-gradient(90deg, #6a11cb 0%, #2575fc 100%);
+            color: white;
+            font-size: 1.5rem;
+            font-weight: bold;
+            padding: 10px 20px;
+            border-radius: 50px;
+            display: inline-block;
+            box-shadow: 0 0 15px rgba(37, 117, 252, 0.6);
+            border: 2px solid white;
+            margin-bottom: 20px;
+            min-width: 300px;
+            text-transform: uppercase;
+        }
+
+        /* RUOTA */
+        .wheel-wrapper { position: relative; width: 350px; height: 350px; margin: 0 auto; border-radius: 50%; overflow: hidden; border: 5px solid gold; box-shadow: 0 0 20px rgba(0,0,0,0.8); }
+        .wheel-image { width: 100%; height: 100%; object-fit: cover; transition: transform 5s cubic-bezier(0.2, 0.8, 0.2, 1); }
+        .pointer-arrow { position: absolute; top: -20px; left: 50%; transform: translateX(-50%); width: 0; height: 0; border-left: 20px solid transparent; border-right: 20px solid transparent; border-top: 40px solid red; z-index: 100; filter: drop-shadow(0 4px 4px rgba(0,0,0,0.5)); }
+        
+        /* GIOCATORI */
+        .player-card { background: rgba(255,255,255,0.1); border: 2px solid transparent; transition: 0.3s; }
+        .player-active { background: rgba(46, 204, 113, 0.2); border: 2px solid #2ecc71; transform: scale(1.05); }
+        .winner-overlay { animation: pulse 2s infinite; border: 5px solid #2ecc71; background: rgba(0,0,0,0.8); }
+        @keyframes pulse { 0% { box-shadow: 0 0 0 0 rgba(46, 204, 113, 0.7); } 70% { box-shadow: 0 0 0 20px rgba(46, 204, 113, 0); } 100% { box-shadow: 0 0 0 0 rgba(46, 204, 113, 0); } }
+
+        /* STILE TIMER */
+        #timer-container { height: 10px; background: #333; margin-bottom: 20px; border-radius: 5px; overflow: hidden; display: none; }
+        #timer-bar { height: 100%; background: linear-gradient(90deg, #ff0000, #ff8800); width: 100%; transition: width 1s linear; }
+    </style>
+</head>
+<body>
+
+<div class="container py-4 text-center">
+    
+    <h1 class="text-warning mb-2" style="text-shadow: 2px 2px 0 #000;">LA RUOTA DELLA FORTUNA</h1>
+    <div class="badge bg-danger fs-5 mb-2">ROUND {{ partita.numero_round }} / {{ partita.totale_rounds }}</div>
+    <h3 class="text-white text-uppercase mb-2" style="letter-spacing: 2px;">{{ partita.frase_corrente.categoria.nome }}</h3>
+
+    <div id="timer-container">
+        <div id="timer-bar"></div>
+    </div>
+    <div id="timer-text" class="text-danger fw-bold mb-2" style="display: none;">TEMPO RIMASTO: <span id="seconds-left">30</span>s</div>
+
+    <div class="board-container mb-4">
+        {% for parola in tabellone %}
+            <div class="word-wrapper">
+                {% for casella in parola %}
+                    {% if request.session.round_vinto %}
+                        <div class="tile bg-success text-white">{{ casella.char }}</div>
+                    {% else %}
+                        {% if casella.visibile %}
+                            <div class="tile">{{ casella.char }}</div>
+                        {% else %}
+                            <div class="tile tile-empty"></div>
+                        {% endif %}
+                    {% endif %}
+                {% endfor %}
+            </div>
+        {% endfor %}
+    </div>
+
+    <div class="mb-5">
+        <div class="hint-bar">
+            {{ partita.frase_corrente.suggerimento }}
+        </div>
+    </div>
+
+    {% if messaggio %}
+        <div class="alert {% if request.session.round_vinto %}alert-success display-6{% else %}alert-warning{% endif %} fw-bold border-3">
+            {{ messaggio }}
+        </div>
+    {% endif %}
+
+    {% if request.session.round_vinto %}
+        <div class="card p-5 winner-overlay text-center">
+            <h1 class="text-success mb-4">🏆 ROUND COMPLETATO! 🏆</h1>
+            <h3 class="text-white">La soluzione era: "{{ partita.frase_corrente.testo }}"</h3>
+            <div class="mt-4">
+                <a href="{% url 'prossimo_round' %}" class="btn btn-lg btn-primary fw-bold px-5">➡️ PROSSIMO ROUND</a>
+            </div>
+        </div>
+    
+    {% else %}
+        <div class="row align-items-center">
+            <div class="col-md-5">
+                <div style="position: relative; width: 350px; margin: 0 auto;">
+                    <div class="pointer-arrow"></div>
+                    <div class="wheel-wrapper">
+                        <img src="{% static 'game/images/ruota.png' %}" class="wheel-image" id="wheelImg" alt="Ruota">
+                    </div>
+                </div>
+                <div class="mt-4">
+                    <h3 class="text-white">Valore: <span class="text-warning fw-bold" id="resultLabel">
+                        {% if valore_ruota == 0 %}Gira!{% else %}{{ valore_ruota }}{% endif %}
+                    </span></h3>
+                </div>
+            </div>
+
+            <div class="col-md-7">
+                <div class="card bg-dark border-secondary p-4 shadow-lg">
+                    <h4 class="mb-3 text-white-50">Turno di: <span class="text-white display-6">{{ giocatore_corrente.nome }}</span></h4>
+                    
+                    <div class="mb-3">
+                        <button id="btnGira" class="btn btn-warning w-100 fw-bold py-3 fs-4 text-uppercase shadow" 
+                            {% if valore_ruota != 0 and valore_ruota != 'BANCAROTTA' and valore_ruota != 'PASSA' %}disabled{% endif %}>
+                            🌀 GIRA LA RUOTA
+                        </button>
+                    </div>
+
+                    <div class="row g-2 mb-4">
+                        <div class="col-md-6">
+                             <form action="{% url 'azione_gioco' %}" method="POST" id="formConsonante">
+                                {% csrf_token %}
+                                <input type="hidden" name="tipo" value="lettera">
+                                <div class="input-group">
+                                    <input type="text" name="lettera_input" class="form-control text-uppercase fw-bold text-center" placeholder="Consonante" maxlength="1" required
+                                           {% if valore_ruota == 0 or valore_ruota == 'BANCAROTTA' or valore_ruota == 'PASSA' %}disabled{% endif %}>
+                                    <button class="btn btn-primary" type="submit" {% if valore_ruota == 0 or valore_ruota == 'BANCAROTTA' or valore_ruota == 'PASSA' %}disabled{% endif %}>OK</button>
+                                </div>
+                            </form>
+                        </div>
+                        <div class="col-md-6">
+                            <form action="{% url 'azione_gioco' %}" method="POST" id="formVocale">
+                                {% csrf_token %}
+                                <input type="hidden" name="tipo" value="lettera">
+                                <div class="input-group">
+                                    <input type="text" name="lettera_input" class="form-control text-uppercase fw-bold text-center" placeholder="Vocale" maxlength="1" required>
+                                    <button class="btn btn-danger" type="submit">500€</button>
+                                </div>
+                            </form>
+                        </div>
+                    </div>
+
+                    <hr class="border-secondary">
+                    <h5 class="text-info mt-3">Conosci la frase?</h5>
+                    <form action="{% url 'azione_gioco' %}" method="POST" id="formSoluzione">
+                        {% csrf_token %}
+                        <input type="hidden" name="tipo" value="soluzione">
+                        <div class="input-group input-group-lg">
+                            <input type="text" name="soluzione_input" class="form-control text-uppercase fw-bold" placeholder="SCRIVI LA FRASE..." required>
+                            <button class="btn btn-success fw-bold" type="submit">TENTA</button>
+                        </div>
+                    </form>
+                    
+                    <form action="{% url 'azione_gioco' %}" method="POST" id="formTimeout">
+                        {% csrf_token %}
+                        <input type="hidden" name="tipo" value="tempo_scaduto">
+                    </form>
+
+                </div>
+            </div>
+        </div>
+    {% endif %}
+
+    <div class="row mt-5 justify-content-center">
+        {% for g in giocatori %}
+        <div class="col-md-3">
+            <div class="card player-card p-3 mb-2 {% if g.id == giocatore_corrente.id %}player-active{% endif %}">
+                <h5 class="mb-0 fw-bold">{{ g.nome }}</h5>
+                <hr style="margin: 5px 0; border-color: rgba(255,255,255,0.3);">
+                
+                <div class="mb-1">
+                    <small class="text-white-50">Parziale:</small>
+                    <span class="text-white fw-bold fs-5">{{ g.montepremi_round }} €</span>
+                </div>
+
+                <div class="bg-black bg-opacity-25 rounded p-1">
+                    <small class="text-warning">TOTALE:</small>
+                    <h3 class="text-warning mb-0">{{ g.punteggio }} €</h3>
+                </div>
+            </div>
+        </div>
+        {% endfor %}
+    </div>
+</div>
+
+<script>
+    // --- VARIABILI GLOBALI ---
+    let currentRotation = 0; 
+    let countdown; // Timer globale
+    
+    const wheel = document.getElementById('wheelImg');
+    const btnGira = document.getElementById('btnGira');
+    const resultLabel = document.getElementById('resultLabel');
+
+    // Recupera la rotazione salvata
+    const savedRotation = sessionStorage.getItem('wheelRotation');
+    if (savedRotation && wheel) {
+        currentRotation = parseFloat(savedRotation);
+        wheel.style.transition = 'none'; 
+        wheel.style.transform = `rotate(${currentRotation}deg)`;
+    }
+
+    // --- LOGICA TIMER ---
+    const roundVinto = "{{ request.session.round_vinto }}" === "True";
+    
+    // Il timer parte SEMPRE se il round non è vinto.
+    if (!roundVinto) {
+        startTimer();
+    }
+
+    function startTimer() {
+        const timerContainer = document.getElementById('timer-container');
+        const timerText = document.getElementById('timer-text');
+        const timerBar = document.getElementById('timer-bar');
+        const secondsLeftSpan = document.getElementById('seconds-left');
+        const formTimeout = document.getElementById('formTimeout');
+
+        if(timerContainer) timerContainer.style.display = 'block';
+        if(timerText) timerText.style.display = 'block';
+
+        let timeLeft = 30;
+        const totalTime = 30;
+
+        // Puliamo eventuali timer precedenti
+        if (countdown) clearInterval(countdown);
+
+        countdown = setInterval(() => {
+            timeLeft--;
+            if(secondsLeftSpan) secondsLeftSpan.innerText = timeLeft;
+            if(timerBar) {
+                const percentage = (timeLeft / totalTime) * 100;
+                timerBar.style.width = percentage + "%";
+                if (timeLeft < 10) timerBar.style.background = "#dc3545"; 
+                else timerBar.style.background = "linear-gradient(90deg, #ff0000, #ff8800)";
+            }
+            if (timeLeft <= 0) {
+                clearInterval(countdown);
+                if(formTimeout) formTimeout.submit();
+            }
+        }, 1000);
+        
+        // Stop timer su submit
+        document.querySelectorAll('form').forEach(f => {
+            f.addEventListener('submit', () => clearInterval(countdown));
+        });
+    }
+
+    // --- LOGICA RUOTA ---
+    if(btnGira){
+        btnGira.addEventListener('click', function() {
+            // STOP TIMER AL CLIC
+            clearInterval(countdown);
+
+            btnGira.disabled = true;
+            resultLabel.innerText = "Gira...";
+
+            fetch("{% url 'api_gira_ruota' %}")
+                .then(response => response.json())
+                .then(data => {
+                    const targetAngle = data.gradi_finali;
+                    const currentMod = currentRotation % 360;
+                    
+                    // Calcolo distanza esatta per evitare drift
+                    let distance = targetAngle - currentMod;
+                    if (distance < 0) distance += 360;
+                    
+                    const extraSpins = 360 * 5; 
+                    const newRotation = currentRotation + extraSpins + distance;
+                    
+                    currentRotation = newRotation;
+
+                    wheel.style.transition = 'transform 5s cubic-bezier(0.1, 0.7, 0.1, 1)';
+                    wheel.style.transform = `rotate(${currentRotation}deg)`;
+
+                    setTimeout(() => {
+                        resultLabel.innerText = data.valore;
+                        sessionStorage.setItem('wheelRotation', currentRotation);
+                        window.location.reload();
+                    }, 5000);
+                })
+                .catch(err => {
+                    console.error(err);
+                    alert("Errore connessione.");
+                    btnGira.disabled = false;
+                });
+        });
+    }
+
+    // Controlli Input
+    const vocali = "AEIOUaeiou";
+    const inpCons = document.querySelector('input[placeholder="Consonante"]');
+    const inpVoc = document.querySelector('input[placeholder="Vocale"]');
+    if(inpCons) inpCons.addEventListener('input', e => { if(vocali.includes(e.target.value)) { alert("Solo consonanti qui!"); e.target.value = ""; }});
+    if(inpVoc) inpVoc.addEventListener('input', e => { if(!vocali.includes(e.target.value) && e.target.value) { alert("Solo vocali qui!"); e.target.value = ""; }});
+</script>
+
+<script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/js/bootstrap.bundle.min.js"></script>
+</body>
+</html>

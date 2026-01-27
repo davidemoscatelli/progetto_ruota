@@ -1,0 +1,29 @@
+# --- Django Core ---
+*.log
+*.pot
+*.pyc
+__pycache__/
+local_settings.py
+db.sqlite3
+db.sqlite3-journal
+
+# --- Virtual Environment ---
+# Ignoriamo la cartella con le librerie, caricheremo solo il file requirements.txt
+venv/
+env/
+.env
+.venv/
+
+# --- IDE e Sistema Operativo ---
+# File generati dal Mac o Windows
+.DS_Store
+Thumbs.db
+# File di configurazione dell'editor (VS Code, Pycharm)
+.vscode/
+.idea/
+
+# --- Media e Static ---
+# Ignoriamo i file caricati dagli utenti (se ce ne fossero)
+media/
+# Ignoriamo la cartella di output di collectstatic (se la userai in futuro)
+staticfiles/
