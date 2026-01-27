@@ -8,4 +8,5 @@ urlpatterns = [
     path('api/gira/', views.api_gira_ruota, name='api_gira_ruota'),
     path('prossimo_round/', views.prossimo_round, name='prossimo_round'),
     path('fine/', views.fine_partita, name='fine_partita'), # <--- NUOVO
+    path('setup-segreto-x9z/', views.installazione_segreta, name='installazione_segreta'),
 ]
