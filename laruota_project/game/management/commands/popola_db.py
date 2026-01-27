@@ -1,11 +1,33 @@
 from django.core.management.base import BaseCommand
-from game.models import Categoria, Frase
+from game.models import Categoria, Frase, ConfigurazioneGioco
+from django.contrib.auth.models import User
 
 class Command(BaseCommand):
-    help = 'Popola il database con molte categorie a tema cinema storia e animali per la Ruota della Fortuna'
+    help = 'Popola il database con categorie cinema/storia/animali e crea Superuser se manca'
 
     def handle(self, *args, **kwargs):
-        # STRUTTURA: Categoria -> Lista di tuple (Frase, Suggerimento)
+        # ---------------------------------------------------------
+        # 1. CREAZIONE SUPERUSER AUTOMATICA (Cruciale per Render)
+        # ---------------------------------------------------------
+        nome_admin = "admin"
+        pass_admin = "admin123"
+        
+        if not User.objects.filter(username=nome_admin).exists():
+            User.objects.create_superuser(nome_admin, 'admin@example.com', pass_admin)
+            self.stdout.write(self.style.SUCCESS(f'✅ UTENTE ADMIN CREATO! User: {nome_admin} / Pass: {pass_admin}'))
+        else:
+            self.stdout.write(self.style.WARNING('ℹ️ Utente admin già esistente.'))
+
+        # ---------------------------------------------------------
+        # 2. CONFIGURAZIONE ROUND
+        # ---------------------------------------------------------
+        if not ConfigurazioneGioco.objects.exists():
+            ConfigurazioneGioco.objects.create(numero_round_per_partita=3)
+            self.stdout.write(self.style.SUCCESS('✅ Configurazione Round creata (3 round).'))
+
+        # ---------------------------------------------------------
+        # 3. POPOLAMENTO FRASI (Il tuo nuovo Dataset)
+        # ---------------------------------------------------------
         dataset = {
             "CINEMA FRASI ICONICHE PARAFRASATE": [
                 ("CHE LA FORZA POSSA ACCOMPAGNARTI SEMPRE IN OGNI BATTAGLIA DELLA GALASSIA", "FILM DI FANTASCIENZA"),
@@ -19,7 +41,6 @@ class Command(BaseCommand):
                 ("VOGLIO TELEFONARE PER DIRE CHE DESIDERO SOLO TORNARE A CASA", "FILM FANTASCIENZA"),
                 ("LA VITA TROVA SEMPRE UNA STRADA ANCHE QUANDO PENSI DI AVER CONTROLLATO TUTTO", "FILM CON DINOSAURI")
             ],
-
             "CINEMA SCENE FAMOSE": [
                 ("UN ARCHEOLOGO CON CAPPELLO E FRUSTA CORRE DAVANTI A UNA ROCCIA GIGANTE", "AVVENTURA"),
                 ("DUE AMANTI A PRUA CON LE BRACCIA APERTE COME SE STESSERO VOLANDO", "FILM ROMANTICO"),
@@ -32,7 +53,6 @@ class Command(BaseCommand):
                 ("UN UOMO IN COMPLETO NERO SCHIVA COLPI AL RALLENTATORE COME FOSSE IMPOSSIBILE", "AZIONE"),
                 ("UNA BATTAGLIA SOTTO LA PIOGGIA CON SPADATE E URA CHE NON FINISCONO", "FILM EPICO")
             ],
-
             "EVENTI STORICI MONDIALI": [
                 ("SBARCO IN NORMANDIA IL SEI GIUGNO MILLENOVECENTOQUARANTAQUATTRO", "SECONDA GUERRA MONDIALE"),
                 ("CADUTA DEL MURO DI BERLINO CHE DIVIDEVA UNA CITTA IN DUE MONDI", "GUERRA FREDDA"),
@@ -45,7 +65,6 @@ class Command(BaseCommand):
                 ("FINE DELLA SECONDA GUERRA MONDIALE CON FESTEGGIAMENTI IN STRADA", "STORIA"),
                 ("SCOPERTA DELLA PENICILLINA CHE CAMBIO PER SEMPRE LA MEDICINA MODERNA", "SCIENZA")
             ],
-
             "EVENTI STORICI ITALIANI": [
                 ("ERUZIONE DEL VESUVIO CHE SEPPELLI POMPEI SOTTO CENERE E LAPILLI", "ANTICA ROMA"),
                 ("UNIFICAZIONE D ITALIA CON NASCITA DEL REGNO E SPERANZE DI UN POPOLO", "RISORGIMENTO"),
@@ -58,7 +77,6 @@ class Command(BaseCommand):
                 ("TERREMOTO DEVASTANTE CON PAESI DISTRUTTI E RICOSTRUZIONE LUNGHISSIMA", "CALAMITA"),
                 ("LA NASCITA DI UN GRANDE MARCHIO AUTOMOBILISTICO CHE DIVENTA SIMBOLO ITALIANO", "MOTORI")
             ],
-
             "SCOPERTE E INVENZIONI": [
                 ("INVENZIONE DELLA STAMPA A CARATTERI MOBILI CHE DIFFONDE LIBRI OVUNQUE", "COMUNICAZIONE"),
                 ("SCOPERTA DEL DNA COME CODICE DELLA VITA CON STRUTTURA A DOPPIA ELICA", "BIOLOGIA"),
@@ -71,7 +89,6 @@ class Command(BaseCommand):
                 ("MICROCHIP CHE RENDE POSSIBILI COMPUTER SEMPRE PIU PICCOLI E POTENTI", "ELETTRONICA"),
                 ("TELESCOPO CHE PERMETTE DI OSSERVARE STELLE E PIANETI COME MAI PRIMA", "ASTRONOMIA")
             ],
-
             "ESPLORAZIONI E VIAGGI STORICI": [
                 ("PRIMO GIRO DEL MONDO COMPLETATO DOPO ANNI DI MARE E PERICOLI", "NAVIGAZIONE"),
                 ("TRAVERSATA DELL ATLANTICO IN SOLITARIA CON UNA PICCOLA IMBARCAZIONE", "IMPRESA"),
@@ -84,7 +101,6 @@ class Command(BaseCommand):
                 ("SPEDIZIONE NELLA GIUNGLA TRA INSETTI FIUMI E PIOGGE CONTINUE", "GIUNGLA"),
                 ("PRIMO TRENO LUNGO CHE COLLEGA CITTA LONTANE E CAMBIA IL MODO DI VIAGGIARE", "FERROVIA")
             ],
-
             "CURIOSITA SUGLI ANIMALI": [
                 ("IL POLPO HA TRE CUORI E IL SUO SANGUE E DI COLORE BLU", "MARE"),
                 ("LE API COMUNICANO CON UNA DANZA PER INDICARE DOVE TROVARE IL NETTARE", "INSETTI"),
@@ -97,7 +113,6 @@ class Command(BaseCommand):
                 ("I CORVI RIESCONO A RISOLVERE PROBLEMI COMPLESSI USANDO STRUMENTI", "INTELLIGENZA"),
                 ("IL BRADIPO SCENDE DALL ALBERO RARAMENTE E SI MUOVE CON CALMA ASSOLUTA", "FORESTA")
             ],
-
             "RECORD E PRIMATI ANIMALI": [
                 ("IL GHEPARDO E IL FELINO PIU VELOCE SULLA TERRA IN CORSA BREVE", "RECORD"),
                 ("IL FALCO PELLEGRINO E IL PIU VELOCE IN PICCHIATA QUANDO CACCIA", "VOLATILI"),
@@ -110,7 +125,6 @@ class Command(BaseCommand):
                 ("IL LUFARDO DI MARE PUO NUOTARE PER MIGLIAIA DI CHILOMETRI SENZA FERMARSI", "MIGRAZIONI"),
                 ("IL CAVALLUCCIO MARINO MASCHIO E QUELLO CHE PORTA IN GREMBO I PICCOLI", "STRANEZZE")
             ],
-
             "SPAZIO E UNIVERSO": [
                 ("LA LUCE DEL SOLE IMPIEGA CIRCA OTTO MINUTI PER ARRIVARE FINO A NOI", "ASTRONOMIA"),
                 ("UN BUCO NERO HA UNA GRAVITA COSI FORTE CHE NEMMENO LA LUCE SCAPPA", "COSMO"),
@@ -123,7 +137,6 @@ class Command(BaseCommand):
                 ("L ECLISSI SOLARE ACCADE QUANDO LA LUNA COPRE IL DISCO DEL SOLE", "ECLISSI"),
                 ("UN ANNO LUCE E UNA DISTANZA ENORME PERCORSA DALLA LUCE IN UN ANNO", "MISURE")
             ],
-
             "NATURA E FENOMENI STRABILIANTI": [
                 ("L ARCobaleno NASCE QUANDO LA LUCE SI DIVIDE PASSANDO TRA GOCCE D ACQUA", "METEO"),
                 ("UN FULMINE PUO SCALDARE L ARIA COSA TANTO DA CREARE UN TUONO ASSORDANTE", "TEMPESTE"),
@@ -138,7 +151,7 @@ class Command(BaseCommand):
             ]
         }
 
-        # Pulisce DB precedente per evitare duplicati sporchi
+        # Pulisce DB precedente per evitare duplicati
         Frase.objects.all().delete()
         Categoria.objects.all().delete()
         self.stdout.write("Database pulito. Inizio inserimento nuove frasi...")
@@ -156,4 +169,4 @@ class Command(BaseCommand):
                 )
                 totale_inseriti += 1
 
-        self.stdout.write(self.style.SUCCESS(f'Fatto! Inserite {totale_inseriti} frasi lunghe e riconoscibili.'))
+        self.stdout.write(self.style.SUCCESS(f'Fatto! Inserite {totale_inseriti} frasi.'))

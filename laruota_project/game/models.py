@@ -42,3 +42,25 @@ class Giocatore(models.Model):
     punteggio = models.IntegerField(default=0)
     montepremi_round = models.IntegerField(default=0)
     def __str__(self): return self.nome
+
+
+class ConfigurazioneGioco(models.Model):
+    numero_round_per_partita = models.IntegerField(default=3, help_text="Quante frasi bisogna indovinare per finire la partita?")
+    
+    # NUOVO CAMPO "GRILLETTO"
+    ricarica_frasi = models.BooleanField(
+        default=False, 
+        help_text="⚠️ SPUNTA QUESTA CASELLA e clicca SALVA per cancellare e ricaricare tutte le frasi dal codice."
+    )
+    
+    class Meta:
+        verbose_name = "Impostazioni Gioco"
+        verbose_name_plural = "Impostazioni Gioco"
+
+    def __str__(self):
+        return f"Configurazione Attuale: {self.numero_round_per_partita} Round"
+
+    def save(self, *args, **kwargs):
+        if not self.pk and ConfigurazioneGioco.objects.exists():
+            return ConfigurazioneGioco.objects.first().save(*args, **kwargs)
+        return super(ConfigurazioneGioco, self).save(*args, **kwargs)

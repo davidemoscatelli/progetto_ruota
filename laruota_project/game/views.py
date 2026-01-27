@@ -369,30 +369,3 @@ def fine_partita(request):
     })
 
 
-def installazione_segreta(request):
-    # 1. Popola il Database (chiama il comando che abbiamo creato)
-    try:
-        call_command('popola_db')
-        msg_db = "Database popolato con successo.<br>"
-    except Exception as e:
-        msg_db = f"Errore popolamento DB: {e}<br>"
-
-    # 2. Crea il Superuser (se non esiste già)
-    # USER: admin
-    # PASS: admin123
-    if not User.objects.filter(username='admin').exists():
-        User.objects.create_superuser('admin', 'admin@example.com', 'admin123')
-        msg_user = "Superuser 'admin' creato con password 'admin123'.<br>"
-    else:
-        msg_user = "Superuser 'admin' esisteva già.<br>"
-
-    # 3. Imposta i Round di default (se non esistono)
-    # (ConfigurazioneGioco viene importato, assicurati che ci sia l'import in alto o fallo qui)
-    from .models import ConfigurazioneGioco
-    if not ConfigurazioneGioco.objects.exists():
-        ConfigurazioneGioco.objects.create(numero_round_per_partita=3)
-        msg_conf = "Configurazione round impostata a 3.<br>"
-    else:
-        msg_conf = "Configurazione round già presente.<br>"
-
-    return HttpResponse(f"<h1>Installazione Completata!</h1>{msg_db}{msg_user}{msg_conf} <a href='/admin'>VAI ALL'ADMIN</a>")
