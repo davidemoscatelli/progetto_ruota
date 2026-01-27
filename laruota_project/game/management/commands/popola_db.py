@@ -1,22 +1,26 @@
 from django.core.management.base import BaseCommand
 from game.models import Categoria, Frase, ConfigurazioneGioco
 from django.contrib.auth.models import User
+import os
 
 class Command(BaseCommand):
     help = 'Popola il database con categorie cinema/storia/animali e crea Superuser se manca'
 
     def handle(self, *args, **kwargs):
         # ---------------------------------------------------------
-        # 1. CREAZIONE SUPERUSER AUTOMATICA (Cruciale per Render)
+        # 1. CREAZIONE SUPERUSER SICURA
         # ---------------------------------------------------------
-        nome_admin = "admin"
-        pass_admin = "admin123"
+
+        nome_admin = os.environ.get('DJANGO_SUPERUSER_USERNAME', 'admin')
+        pass_admin = os.environ.get('DJANGO_SUPERUSER_PASSWORD', 'admin123')
+        email_admin = os.environ.get('DJANGO_SUPERUSER_EMAIL', 'admin@example.com')
         
         if not User.objects.filter(username=nome_admin).exists():
-            User.objects.create_superuser(nome_admin, 'admin@example.com', pass_admin)
-            self.stdout.write(self.style.SUCCESS(f'✅ UTENTE ADMIN CREATO! User: {nome_admin} / Pass: {pass_admin}'))
+            User.objects.create_superuser(nome_admin, email_admin, pass_admin)
+            # Non stampiamo la password nei log per sicurezza!
+            self.stdout.write(self.style.SUCCESS(f'✅ UTENTE ADMIN CREATO: {nome_admin}'))
         else:
-            self.stdout.write(self.style.WARNING('ℹ️ Utente admin già esistente.'))
+            self.stdout.write(self.style.WARNING(f'ℹ️ Utente admin {nome_admin} già esistente.'))
 
         # ---------------------------------------------------------
         # 2. CONFIGURAZIONE ROUND
