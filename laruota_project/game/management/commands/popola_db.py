@@ -8,19 +8,32 @@ class Command(BaseCommand):
 
     def handle(self, *args, **kwargs):
         # ---------------------------------------------------------
-        # 1. CREAZIONE SUPERUSER SICURA
+        # 1. GESTIONE SUPERUSER (Creazione o Aggiornamento)
         # ---------------------------------------------------------
-
         nome_admin = os.environ.get('DJANGO_SUPERUSER_USERNAME', 'admin')
         pass_admin = os.environ.get('DJANGO_SUPERUSER_PASSWORD', 'admin123')
         email_admin = os.environ.get('DJANGO_SUPERUSER_EMAIL', 'admin@example.com')
         
-        if not User.objects.filter(username=nome_admin).exists():
-            User.objects.create_superuser(nome_admin, email_admin, pass_admin)
-            # Non stampiamo la password nei log per sicurezza!
-            self.stdout.write(self.style.SUCCESS(f'✅ UTENTE ADMIN CREATO: {nome_admin}'))
-        else:
-            self.stdout.write(self.style.WARNING(f'ℹ️ Utente admin {nome_admin} già esistente.'))
+        try:
+            # Cerca l'utente. Se non c'è, lo crea.
+            user, created = User.objects.get_or_create(
+                username=nome_admin,
+                defaults={'email': email_admin}
+            )
+            
+            # IMPOSIZIONE DELLA PASSWORD (LO FA SEMPRE)
+            user.set_password(pass_admin)
+            user.is_superuser = True
+            user.is_staff = True
+            user.save()
+            
+            if created:
+                self.stdout.write(self.style.SUCCESS(f'✅ UTENTE CREATO: {nome_admin}'))
+            else:
+                self.stdout.write(self.style.SUCCESS(f'✅ PASSWORD AGGIORNATA per utente esistente: {nome_admin}'))
+                
+        except Exception as e:
+             self.stdout.write(self.style.ERROR(f'❌ Errore utente: {e}'))
 
         # ---------------------------------------------------------
         # 2. CONFIGURAZIONE ROUND
