@@ -217,25 +217,38 @@ def prossimo_round(request):
     partita_id = request.session.get('partita_id')
     partita = get_object_or_404(Partita, id=partita_id)
     
+    # 1. Avanza il numero del round
     partita.numero_round += 1
-    partita.turno_corrente = 0 
+    
+    # --- MODIFICA FONDAMENTALE ---
+    # Prima c'era: partita.turno_corrente = 0
+    # ORA LO TOLGO. In questo modo il 'turno_corrente' resta quello dell'ultimo
+    # giocatore attivo, cioè quello che ha appena vinto il round precedente.
+    # -----------------------------
+    
     partita.lettere_chiamate = ""
     
+    # Gestione Frasi Usate
     frasi_usate = request.session.get('frasi_usate', [])
-    if partita.frase_corrente: frasi_usate.append(partita.frase_corrente.id)
+    if partita.frase_corrente: 
+        frasi_usate.append(partita.frase_corrente.id)
     
     nuova = Frase.objects.exclude(id__in=frasi_usate).order_by('?').first()
     
     if nuova and partita.numero_round <= partita.totale_rounds:
         partita.frase_corrente = nuova
         partita.save()
+        
         request.session['frasi_usate'] = frasi_usate
         request.session['round_vinto'] = False
         request.session['valore_ruota'] = 0
-        request.session['messaggio'] = f"Round {partita.numero_round}!"
+        request.session['messaggio'] = f"Inizia il Round {partita.numero_round}! Parte chi ha vinto."
+        
+        # Reset solo del parziale del round, non del totale
         for g in partita.giocatori.all():
             g.montepremi_round = 0
             g.save()
+            
         return redirect('gioco')
     else:
         return redirect('fine_partita')
@@ -244,9 +257,15 @@ def fine_partita(request):
     partita_id = request.session.get('partita_id')
     if not partita_id: return redirect('setup_partita')
     partita = get_object_or_404(Partita, id=partita_id)
+    
+    # Ordiniamo per punteggio decrescente
+    classifica = partita.giocatori.all().order_by('-punteggio')
+    vincitore_assoluto = classifica.first()
+    
+    # Inviamo la variabile 'classifica' al template
     return render(request, 'game/fine_partita.html', {
-        'classifica': partita.giocatori.all().order_by('-punteggio'),
-        'vincitore': partita.giocatori.all().order_by('-punteggio').first()
+        'classifica': classifica,
+        'vincitore': vincitore_assoluto
     })
 
 # --- HELPER PER CAMBIO TURNO SICURO ---
